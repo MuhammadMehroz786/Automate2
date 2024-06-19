@@ -5,3 +5,4 @@ pandas==1.4.3
 openai==0.28
 python-dotenv==0.21.0
 openpyxl==3.0.9
+xlsxwriter==3.0.1
