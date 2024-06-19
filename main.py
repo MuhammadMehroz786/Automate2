@@ -3,7 +3,6 @@ import pandas as pd
 import openai
 import os
 
-
 st.set_page_config(page_title="ASK YOUR Sheet")
 
 def main():
@@ -62,13 +61,31 @@ def main():
         # Create a DataFrame from the list of tuples
         cefr_df = pd.DataFrame(word_cefr_pairs, columns=['Word', 'CEFR Level'])
 
-        # Save DataFrame to Excel
-        output_file_path = '/path/to/output_file.xlsx'  # Replace with your desired output file path
-        try:
-            cefr_df.to_excel(output_file_path, index=False)
-            st.success(f"CEFR levels saved to {output_file_path}")
-        except Exception as e:
-            st.write(f"Error saving Excel file: {e}")
+        # Specify output directory and file name
+        output_dir = './output'  # Update with your desired directory
+        os.makedirs(output_dir, exist_ok=True)  # Create directory if it doesn't exist
+
+        output_file_path = os.path.join(output_dir, 'cefr_levels.xlsx')
+
+        # Save the DataFrame to Excel with progress bar
+        with st.spinner('Saving data...'):
+            progress_bar = st.progress(0)
+            try:
+                cefr_df.to_excel(output_file_path, index=False)
+                st.success(f"CEFR levels saved to {output_file_path}")
+            except Exception as e:
+                st.write(f"Error saving Excel file: {e}")
+                return
+            finally:
+                progress_bar.progress(100)
+
+        # Add download button
+        st.download_button(
+            label="Download CEFR Data as Excel",
+            data=open(output_file_path, 'rb').read(),
+            file_name="cefr_levels.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
 
 if __name__ == '__main__':
     main()
