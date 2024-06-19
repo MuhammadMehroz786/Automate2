@@ -1,81 +1,74 @@
-import openai
-import pandas as pd
-import time
 import streamlit as st
-from io import BytesIO
-import xlsxwriter  # Make sure this line is added for proper Excel writing
+import pandas as pd
+import openai
+import os
 
-st.set_page_config(page_title="CEFR Level Sheet")
+
+st.set_page_config(page_title="ASK YOUR Sheet")
 
 def main():
     api_key = st.text_input("Enter your OpenAI API Key", type="password")
+
     st.header("Ask your Sheet")
 
     file_path = st.file_uploader("Upload your Excel Sheet", type="xlsx")
 
-    if file_path is not None and api_key:
-        df = pd.read_excel(file_path)
-        words = df['Table 1'].dropna().tolist()[0:800]
+    if file_path is not None:
+        try:
+            df = pd.read_excel(file_path)
+        except Exception as e:
+            st.write(f"Error reading the Excel file: {e}")
+            return
 
-        openai.api_key = api_key
+        # Convert the data into a single string
+        text = ' '.join(df.stack().astype(str))
 
-        def get_cefr_level(word):
-            retries = 0
-            max_retries = 5
-            backoff_factor = 1.5
+        if api_key:
+            openai.api_key = api_key
+        else:
+            st.write("Please enter your OpenAI API Key.")
+            return
 
-            while retries < max_retries:
-                try:
-                    response = openai.ChatCompletion.create(
-                        model="gpt-3.5-turbo",
-                        messages=[
-                            {"role": "system", "content": "You are a helpful assistant knowledgeable about CEFR levels. Only give a one-word answer which is the CEFR level of the word asked."},
-                            {"role": "user", "content": f"What is the CEFR level of the word '{word}'?"}
-                        ],
-                        max_tokens=10
-                    )
-                    return response['choices'][0]['message']['content'].strip()
-                except openai.error.RateLimitError:
-                    wait = (backoff_factor ** retries) * 2
-                    time.sleep(wait)
-                    retries += 1
-                except Exception as e:
-                    print(f"An error occurred: {e}")
-                    break
+        # Define your messages
+        messages = [
+            {"role": "system", "content": "You are a helpful assistant and very very knowledgeable about CEFR levels. and only give a two word answer for each word, which is the word it self and the CEFR level for each of the words entered and do this very very carefully so that there are no Mistakes do the same and give the answer in the form Abandon B2 Ability B1 Able A2 Abortion B2 About A1 etc"},
+            {"role": "user", "content": text}
+        ]
 
-            return "Rate limit exceeded, try again later."
+        # Call the OpenAI API to get the completion
+        try:
+            response = openai.ChatCompletion.create(
+                model="gpt-3.5-turbo",
+                messages=messages,
+                max_tokens=1000
+            )
+        except Exception as e:
+            st.write(f"Error communicating with OpenAI API: {e}")
+            return
 
-        word_cefr_levels = []
+        # Get the answer from the API response
+        answer = response.choices[0]['message']['content']
 
-        progress_bar = st.progress(0)
-        total_words = len(words)
+        # Split the answer into words and their CEFR levels
+        words_cefr_levels = answer.split()
 
-        for i, word in enumerate(words):
-            try:
-                cefr_level = get_cefr_level(word)
-                word_cefr_levels.append((word, cefr_level))
-                time.sleep(1)
-            except Exception as e:
-                print(f"An error occurred for word '{word}': {e}")
-                word_cefr_levels.append((word, 'Error'))
-            
-            progress_bar.progress((i + 1) / total_words)
+        # Create a list to store tuples of (word, CEFR level)
+        word_cefr_pairs = []
+        for i in range(0, len(words_cefr_levels), 2):
+            word = words_cefr_levels[i]
+            cefr_level = words_cefr_levels[i + 1]
+            word_cefr_pairs.append((word, cefr_level))
 
-        cefr_df = pd.DataFrame(word_cefr_levels, columns=['Word', 'CEFR Level'])
+        # Create a DataFrame from the list of tuples
+        cefr_df = pd.DataFrame(word_cefr_pairs, columns=['Word', 'CEFR Level'])
 
-        output = BytesIO()
-        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-            cefr_df.to_excel(writer, index=False)
-        excel_data = output.getvalue()
+        # Save DataFrame to Excel
+        output_file_path = '/path/to/output_file.xlsx'  # Replace with your desired output file path
+        try:
+            cefr_df.to_excel(output_file_path, index=False)
+            st.success(f"CEFR levels saved to {output_file_path}")
+        except Exception as e:
+            st.write(f"Error saving Excel file: {e}")
 
-        st.success('CEFR levels processed successfully.')
-
-        st.download_button(
-            label="Download CEFR Data as Excel",
-            data=excel_data,
-            file_name="cefr_words.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
