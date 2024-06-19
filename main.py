@@ -3,6 +3,7 @@ import pandas as pd
 import time
 import streamlit as st
 from io import BytesIO
+import xlsxwriter  # Make sure this line is added for proper Excel writing
 
 st.set_page_config(page_title="CEFR Level Sheet")
 
