@@ -2,8 +2,9 @@ import openai
 import pandas as pd
 import time
 import streamlit as st
+from io import BytesIO
 
-st.set_page_config(page_title="CERF Level Sheet")
+st.set_page_config(page_title="CEFR Level Sheet")
 
 def main():
     api_key = st.text_input("Enter your OpenAI API Key", type="password")
@@ -30,7 +31,7 @@ def main():
                             {"role": "system", "content": "You are a helpful assistant knowledgeable about CEFR levels. Only give a one-word answer which is the CEFR level of the word asked."},
                             {"role": "user", "content": f"What is the CEFR level of the word '{word}'?"}
                         ],
-                        max_tokens=1000
+                        max_tokens=10
                     )
                     return response['choices'][0]['message']['content'].strip()
                 except openai.error.RateLimitError:
@@ -45,7 +46,10 @@ def main():
 
         word_cefr_levels = []
 
-        for word in words:
+        progress_bar = st.progress(0)
+        total_words = len(words)
+
+        for i, word in enumerate(words):
             try:
                 cefr_level = get_cefr_level(word)
                 word_cefr_levels.append((word, cefr_level))
@@ -53,18 +57,23 @@ def main():
             except Exception as e:
                 print(f"An error occurred for word '{word}': {e}")
                 word_cefr_levels.append((word, 'Error'))
+            
+            progress_bar.progress((i + 1) / total_words)
 
         cefr_df = pd.DataFrame(word_cefr_levels, columns=['Word', 'CEFR Level'])
-        output_file_path = 'cefr_words.xlsx'
-        cefr_df.to_excel(output_file_path, index=False)
 
-        st.success(f'CEFR levels saved to {output_file_path}')
+        output = BytesIO()
+        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+            cefr_df.to_excel(writer, index=False)
+        excel_data = output.getvalue()
 
-        download_button = st.download_button(
+        st.success('CEFR levels processed successfully.')
+
+        st.download_button(
             label="Download CEFR Data as Excel",
-            data=cefr_df.to_excel(index=False),
+            data=excel_data,
             file_name="cefr_words.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
 
 if __name__ == "__main__":
