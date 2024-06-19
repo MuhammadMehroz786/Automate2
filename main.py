@@ -30,7 +30,7 @@ def main():
                             {"role": "system", "content": "You are a helpful assistant knowledgeable about CEFR levels. Only give a one-word answer which is the CEFR level of the word asked."},
                             {"role": "user", "content": f"What is the CEFR level of the word '{word}'?"}
                         ],
-                        max_tokens=10
+                        max_tokens=1000
                     )
                     return response['choices'][0]['message']['content'].strip()
                 except openai.error.RateLimitError:
